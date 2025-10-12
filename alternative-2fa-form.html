@@ -4,447 +4,499 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Caddy Server</title>
-    <style nonce="{{ .Nonce }}">
-        /* --- Base & Light Mode Styles --- */
-        * {
-            padding: 0;
-            margin: 0;
-            box-sizing: border-box;
+
+<style nonce="{{ .Nonce }}">
+    /* --- Base & Light Mode Styles --- */
+    * {
+        padding: 0;
+        margin: 0;
+        box-sizing: border-box;
+    }
+
+    html, body {
+        height: 100%;
+        margin: 0;
+    }
+
+    :root {
+        /* Text and Primary Colors */
+        --text-color: #333;
+        --primary-color: #007bff;
+        --background-color: #f7f9fb;
+        --container-bg: white;
+        --shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+        --border-color: #dee2e6;
+        --error-color: #dc3545;
+        --input-bg: white;
+        --button-hover: #0069d9;
+
+        --app-height: 100vh;
+    }
+
+    body {
+        font-family: Inter, system-ui, sans-serif;
+        font-size: 16px;
+        background-color: var(--background-color);
+        color: var(--text-color);
+        padding: 20px;
+        overflow-y: auto;
+
+        /* Flexbox Centering */
+        min-height: var(--app-height);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+    }
+
+    /* Mobile viewport height fix */
+    @supports (height: 100lvh) {
+      body {
+        min-height: 100lvh;
+      }
+    }
+
+    /* Fallback for older browsers without lvh support */
+    @media (max-width: 440px) {
+        body {
+            min-height: 100%;
+        }
+    }
+
+
+    .container {
+        text-align: center;
+        width: 100%;
+        max-width: 400px;
+        background-color: var(--container-bg);
+        padding: 30px;
+        border-radius: 8px;
+        box-shadow: var(--shadow);
+        box-sizing: border-box;
+    }
+
+    /* Small screen adjustments */
+    @media (max-width: 440px) {
+        .container {
+            padding: 20px;
+        }
+        body {
+            padding: 10px;
+        }
+    }
+
+
+    h1 {
+        font-size: 24px;
+        font-family: Poppins, system-ui, sans-serif;
+        font-weight: 600;
+        color: var(--text-color);
+        margin-bottom: 0.5em;
+    }
+
+    .description {
+        font-size: 1em;
+        color: #6c757d;
+        margin-bottom: 2.5em;
+        line-height: 1.5;
+    }
+
+    .form-group {
+        margin-bottom: 1.5rem;
+        text-align: center;
+    }
+
+    /* --- Multi-Digit Code Input Styling --- */
+    .code-input-wrapper {
+        display: flex;
+        justify-content: center;
+        gap: 8px;
+        width: 100%;
+        max-width: 100%;
+        margin: 0 auto;
+    }
+
+    /* Graceful degradation for super-small devices */
+    @media (max-width: 380px) {
+        .code-input-wrapper input[type="text"] {
+            height: 50px;
+            font-size: 1.3em;
+        }
+    }
+
+    .code-input-wrapper input[type="text"] {
+        width: 0;
+        flex-grow: 1;
+        max-width: 45px;
+        height: 55px;
+        padding: 0;
+        font-size: 1.5em;
+        text-align: center;
+        letter-spacing: normal;
+        border: 1px solid var(--border-color);
+        border-radius: 6px;
+        transition: border-color 0.2s, box-shadow 0.2s;
+        background-color: var(--input-bg);
+        color: var(--text-color);
+    }
+
+    .code-input-wrapper input[type="text"]:focus {
+        border-color: var(--primary-color);
+        box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.2);
+        outline: none;
+    }
+
+    .button-primary {
+        background-color: var(--primary-color);
+        color: white;
+        padding: 12px 25px;
+        font-size: 1em;
+        font-weight: 600;
+        border: none;
+        border-radius: 6px;
+        cursor: pointer;
+        width: 100%;
+        margin-top: 2rem;
+        transition: background-color 0.2s, transform 0.1s;
+    }
+
+    .button-primary:hover {
+        background-color: var(--button-hover);
+    }
+
+    .button-primary:active {
+        transform: scale(0.99);
+    }
+
+    .error-message {
+        color: var(--error-color);
+        font-size: 0.95em;
+        margin-top: 2em;
+        font-weight: 600;
+        padding: 10px;
+        border-radius: 4px;
+        background-color: #f8d7da;
+        border: 1px solid #f5c6cb;
+    }
+
+    /* --- Footer Styles --- */
+    footer {
+        padding: 20px 20px;
+        font-size: 12px;
+        text-align: center;
+        margin-top: 15px;
+    }
+
+    .caddy-logo {
+        display: inline-block;
+        height: 2.5em;
+        margin: 0 4px;
+        vertical-align: middle;
+    }
+
+    /* --- Dark Mode Styles --- */
+    @media (prefers-color-scheme: dark) {
+        :root {
+            /* Dark Mode Overrides */
+            --text-color: #e5e5e5;
+            --primary-color: #6daaf3;
+            --background-color: #1a1f26;
+            --container-bg: #222b36;
+            --shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+            --border-color: #3f4a59;
+            --input-bg: #2b3540;
+            --button-hover: #8cbdf7;
         }
 
-        :root {
-            /* Text and Primary Colors */
-            --text-color: #333;
-            --primary-color: #007bff;
-            --background-color: #f7f9fb;
-            --container-bg: white;
-            --shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
-            --border-color: #dee2e6;
-            --error-color: #dc3545;
-            --input-bg: white;
-            --button-hover: #0069d9;
+        /* Background gradient applied to HTML to cover full scroll area */
+        html {
+            background: linear-gradient(180deg, rgb(34 50 66) 0%, rgb(26 31 38) 100%);
+            background-attachment: fixed;
         }
 
         body {
-            font-family: Inter, system-ui, sans-serif;
-            font-size: 16px;
-            background-color: var(--background-color);
-            min-height: 100vh;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            padding: 20px;
-            color: var(--text-color);
-        }
-
-        .container {
-            text-align: center;
-            width: 100%;
-            max-width: 400px;
-            background-color: var(--container-bg);
-            padding: 40px;
-            border-radius: 8px;
-            box-shadow: var(--shadow);
-            box-sizing: border-box;
-            margin-bottom: 20px;
+            background: none;
+            background-attachment: none;
         }
 
         h1 {
-            font-size: 24px;
-            font-family: Poppins, system-ui, sans-serif;
-            font-weight: 600;
-            color: var(--text-color);
-            margin-bottom: 0.5em;
+            color: white;
         }
 
         .description {
-            font-size: 1em;
-            color: #6c757d;
-            margin-bottom: 2.5em;
-            line-height: 1.5;
-        }
-
-        .form-group {
-            margin-bottom: 1.5rem;
-            text-align: center;
-        }
-
-        /* --- New: Multi-Digit Code Input Styling --- */
-        .code-input-wrapper {
-            display: flex;
-            justify-content: space-between;
-            gap: 10px;
-            width: 100%;
-            max-width: 320px;
-            margin: 0 auto;
+            color: var(--text-color);
         }
 
         .code-input-wrapper input[type="text"] {
-            /* Input box dimensions */
-            width: 45px;
-            height: 55px;
-            padding: 0;
-            font-size: 1.5em;
-            text-align: center;
-            letter-spacing: normal;
             border: 1px solid var(--border-color);
-            border-radius: 6px;
-            transition: border-color 0.2s, box-shadow 0.2s;
             background-color: var(--input-bg);
             color: var(--text-color);
         }
 
         .code-input-wrapper input[type="text"]:focus {
             border-color: var(--primary-color);
-            box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.2);
-            outline: none;
+            box-shadow: 0 0 0 2px rgba(109, 170, 243, 0.3);
         }
 
         .button-primary {
             background-color: var(--primary-color);
-            color: white;
-            padding: 12px 25px;
-            font-size: 1em;
-            font-weight: 600;
-            border: none;
-            border-radius: 6px;
-            cursor: pointer;
-            width: 100%;
-            margin-top: 2rem;
-            transition: background-color 0.2s, transform 0.1s;
+            color: #101720;
         }
 
         .button-primary:hover {
             background-color: var(--button-hover);
-        }
-
-        .button-primary:active {
-            transform: scale(0.99);
+            color: #101720;
         }
 
         .error-message {
-            color: var(--error-color);
-            font-size: 0.95em;
-            margin-top: 2em;
-            font-weight: 600;
-            padding: 10px;
-            border-radius: 4px;
-            background-color: #f8d7da;
-            border: 1px solid #f5c6cb;
+            color: #ff6b6b;
+            background-color: #4a1f1f;
+            border: 1px solid #6e3030;
         }
 
-        /* --- Footer Styles --- */
+        /* Dark Mode SVG Overrides */
         footer {
-            padding: 20px 20px;
-            font-size: 12px;
-            text-align: center;
+            color: #ccc;
         }
 
-        .caddy-logo {
-            display: inline-block;
-            height: 2.5em;
-            margin: 0 4px;
-            vertical-align: middle;
+        /* Selectors matching target CSS to invert Caddy logo colors */
+        .caddy-logo #Wordmark path,
+        .caddy-logo #R path {
+            fill: #ccc !important;
         }
-
-        /* --- Dark Mode Styles --- */
-        @media (prefers-color-scheme: dark) {
-            :root {
-                /* Dark Mode Overrides */
-                --text-color: #e5e5e5;
-                --primary-color: #6daaf3;
-                --background-color: #1a1f26;
-                --container-bg: #222b36;
-                --shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
-                --border-color: #3f4a59;
-                --input-bg: #2b3540;
-                --button-hover: #8cbdf7;
-            }
-
-            body {
-                background: linear-gradient(180deg, rgb(34 50 66) 0%, rgb(26 31 38) 100%);
-                background-attachment: fixed;
-            }
-
-            h1 {
-                color: white;
-            }
-
-            .description {
-                color: var(--text-color);
-            }
-
-            .code-input-wrapper input[type="text"] {
-                border: 1px solid var(--border-color);
-                background-color: var(--input-bg);
-                color: var(--text-color);
-            }
-
-            .code-input-wrapper input[type="text"]:focus {
-                border-color: var(--primary-color);
-                box-shadow: 0 0 0 2px rgba(109, 170, 243, 0.3);
-            }
-
-            .button-primary {
-                background-color: var(--primary-color);
-                color: #101720;
-            }
-
-            .button-primary:hover {
-                background-color: var(--button-hover);
-                color: #101720;
-            }
-
-            .error-message {
-                color: #ff6b6b;
-                background-color: #4a1f1f;
-                border: 1px solid #6e3030;
-            }
-
-            /* Dark Mode SVG Overrides */
-            footer {
-                color: #ccc;
-            }
-
-            /* Selectors matching target CSS to invert Caddy logo colors */
-            .caddy-logo #Wordmark path,
-            .caddy-logo #R path {
-                fill: #ccc !important;
-            }
-            .caddy-logo #R circle {
-                stroke: #ccc !important;
-            }
+        .caddy-logo #R circle {
+            stroke: #ccc !important;
         }
-    </style>
+    }
+</style>
+
 </head>
 <body>
-    <div class="container">
-        <h1>Two-factor authentication</h1>
-        <p class="description">
-            Enter 6-digit code from your authenticator app to continue.
-        </p>
-        <form method="POST" action="" id="otp-form">
-            <div class="form-group">
-                <div class="code-input-wrapper">
-                    <input type="text" id="digit-1" name="digit-1" maxlength="1" inputmode="numeric" pattern="\d{1}" required autofocus autocomplete="one-time-code">
-                    <input type="text" id="digit-2" name="digit-2" maxlength="1" inputmode="numeric" pattern="\d{1}" required>
-                    <input type="text" id="digit-3" name="digit-3" maxlength="1" inputmode="numeric" pattern="\d{1}" required>
-                    <input type="text" id="digit-4" name="digit-4" maxlength="1" inputmode="numeric" pattern="\d{1}" required>
-                    <input type="text" id="digit-5" name="digit-5" maxlength="1" inputmode="numeric" pattern="\d{1}" required>
-                    <input type="text" id="digit-6" name="digit-6" maxlength="1" inputmode="numeric" pattern="\d{1}" required>
+<div class="container">
+    <h1>Two-factor authentication</h1>
+    <p class="description">
+        Enter <span id="code-length-display">{{ .TOTPCodeLength }}</span>-digit code from your authenticator app to continue.
+    </p>
+    <form method="POST" action="" id="otp-form">
+        <div class="form-group">
+            <div class="code-input-wrapper" id="code-input-target">
                 </div>
 
-                <input type="hidden" id="hidden-code" name="totp_code" value="">
-            </div>
-            </form>
-        {{- if .ErrorMessage }}
-        <p class="error-message">{{ .ErrorMessage }}</p>
-        {{- end }}
-    </div>
+            <input type="hidden" id="dynamic-code-length" value="{{ .TOTPCodeLength }}">
+            <input type="hidden" id="hidden-code" name="totp_code" value="">
+        </div>
+    </form>
+    {{- if .ErrorMessage }}
+    <p class="error-message">{{ .ErrorMessage }}</p>
+    {{- end }}
+</div>
 
-    <script nonce="{{ .Nonce }}">
-        const codeLength = 6;
-        const form = document.getElementById('otp-form');
-        const inputs = Array.from(document.querySelectorAll('.code-input-wrapper input[type="text"]'));
-        const hiddenInput = document.getElementById('hidden-code');
-        const firstInput = inputs[0];
+<script nonce="{{ .Nonce }}">
+    const codeLength = parseInt(document.getElementById('dynamic-code-length').value, 10);
+    const form = document.getElementById('otp-form');
+    const inputTarget = document.getElementById('code-input-target');
+    const hiddenInput = document.getElementById('hidden-code');
+    let inputs = [];
 
-        // Function to combine the digits into the hidden field
-        function updateHiddenField() {
-            const combinedCode = inputs.map(input => input.value).join('');
-            hiddenInput.value = combinedCode;
-            return combinedCode;
-        }
+    /**
+     * Creates and appends the required number of single-digit input fields.
+     */
+    function createInputElements() {
+        for (let i = 0; i < codeLength; i++) {
+            const input = document.createElement('input');
+            const index = i + 1;
 
-        // Function to submit the form
-        function submitFormIfComplete() {
-            const combinedCode = updateHiddenField();
-            if (combinedCode.length === codeLength) {
-                form.submit();
+            input.type = 'text';
+            input.id = 'digit-' + index;
+            input.name = 'digit-' + index;
+            input.maxLength = 1;
+            input.inputMode = 'numeric';
+            input.pattern = '\\d{1}';
+            input.required = true;
+
+            if (i === 0) {
+                input.autofocus = true;
+                input.autocomplete = 'one-time-code';
             }
+
+            inputTarget.appendChild(input);
         }
 
-        // --- Core Flow Management Function ---
-        // Manages readonly state and forces focus to the first empty, writable input.
-        function updateInputStateAndFocus(currentInputIndex = -1) {
-            let firstEmptyIndex = -1;
+        inputs = Array.from(inputTarget.querySelectorAll('input[type="text"]'));
+        document.getElementById('code-length-display').textContent = codeLength;
 
-            // 1. Set readonly state based on filled status
-            inputs.forEach((input, index) => {
-                if (input.value.length === 1) {
+        return inputs[0];
+    }
+
+    const firstInput = createInputElements();
+
+    // Combines the digits into the hidden field for submission
+    function updateHiddenField() {
+        const combinedCode = inputs.map(input => input.value).join('');
+        hiddenInput.value = combinedCode;
+        return combinedCode;
+    }
+
+    // Submits the form if all digits are entered
+    function submitFormIfComplete() {
+        const combinedCode = updateHiddenField();
+        if (combinedCode.length === codeLength) {
+            form.submit();
+        }
+    }
+
+    /**
+     * Manages readonly state and forces focus to the first empty input.
+     */
+    function updateInputStateAndFocus(currentInputIndex = -1) {
+        let firstEmptyIndex = -1;
+
+        // 1. Set readonly state based on filled status
+        inputs.forEach((input, index) => {
+            if (input.value.length === 1) {
+                input.removeAttribute('readonly');
+            } else {
+                if (firstEmptyIndex === -1) {
+                    firstEmptyIndex = index;
                     input.removeAttribute('readonly');
                 } else {
-                    // Find the first empty input
-                    if (firstEmptyIndex === -1) {
-                        firstEmptyIndex = index;
-                        input.removeAttribute('readonly'); // Ensure the target is writable
-                    } else {
-                        // All inputs after the first empty one should be readonly
-                        input.setAttribute('readonly', 'readonly');
-                    }
+                    input.setAttribute('readonly', 'readonly');
                 }
-            });
+            }
+        });
 
-            // 2. Force focus to the correct input (first empty, or the last one if full)
-            if (firstEmptyIndex !== -1) {
-                // If a specific index was passed, focus it *only* if it is currently writable.
-                const targetIndex = (currentInputIndex !== -1 && !inputs[currentInputIndex].hasAttribute('readonly'))
+        // 2. Force focus to the correct input
+        if (firstEmptyIndex !== -1) {
+            const targetIndex = (currentInputIndex !== -1 && !inputs[currentInputIndex].hasAttribute('readonly'))
                                     ? currentInputIndex
                                     : firstEmptyIndex;
 
-                inputs[targetIndex].focus();
-                // Set cursor to the end of the text
-                inputs[targetIndex].setSelectionRange(inputs[targetIndex].value.length, inputs[targetIndex].value.length);
-            } else if (inputs.length > 0) {
-                // All inputs are full, focus on the last one
-                inputs[inputs.length - 1].focus();
-                inputs[inputs.length - 1].setSelectionRange(inputs[inputs.length - 1].value.length, inputs[inputs.length - 1].value.length);
-            }
-
-            updateHiddenField();
+            inputs[targetIndex].focus();
+            inputs[targetIndex].setSelectionRange(inputs[targetIndex].value.length, inputs[targetIndex].value.length);
+        } else if (inputs.length > 0) {
+            // All inputs are full, focus on the last one
+            inputs[inputs.length - 1].focus();
+            inputs[inputs.length - 1].setSelectionRange(inputs[inputs.length - 1].value.length, inputs[inputs.length - 1].value.length);
         }
 
-        // --- Autofill Handler on the first input (where the code lands) ---
-        function handleAutofill(event) {
-            let fullCode = firstInput.value.replace(/[^0-9]/g, '');
+        updateHiddenField();
+    }
 
-            // Only proceed if the first input contains more than one digit (i.e., it was autofilled/pasted)
-            if (fullCode.length > 1) {
-                event.preventDefault();
+    // Handles autofill/multi-digit paste from the first input
+    function handleAutofill(event) {
+        let fullCode = firstInput.value.replace(/[^0-9]/g, '');
 
-                // Distribute the code across all inputs
-                for (let i = 0; i < codeLength; i++) {
-                    if (i < fullCode.length) {
-                        inputs[i].value = fullCode[i];
-                        inputs[i].removeAttribute('readonly'); // Ensure fields are writable
-                    } else {
-                        inputs[i].value = '';
-                    }
+        if (fullCode.length > 1 || fullCode.length === codeLength) {
+            event.preventDefault();
+
+            // Distribute the code across all inputs
+            for (let i = 0; i < codeLength; i++) {
+                if (i < fullCode.length) {
+                    inputs[i].value = fullCode[i];
+                    inputs[i].removeAttribute('readonly');
+                } else {
+                    inputs[i].value = '';
                 }
-
-                // Finalize state and submission
-                updateInputStateAndFocus();
-                submitFormIfComplete();
-                return true; // Indicate that autofill was handled
             }
-            return false; // Indicate autofill was not handled
-        }
 
-        // --- Initial Setup: Set all but the first input to readonly ---
-        inputs.forEach((input, index) => {
-            if (index > 0) {
-                input.setAttribute('readonly', 'readonly');
+            updateInputStateAndFocus();
+            submitFormIfComplete();
+            return true;
+        }
+        return false;
+    }
+
+    // Initial Setup: Set all but the first input to readonly
+    inputs.forEach((input, index) => {
+        if (index > 0) {
+            input.setAttribute('readonly', 'readonly');
+        }
+    });
+
+    // Listen for the autofill/autocomplete event on the first input
+    firstInput.addEventListener('change', handleAutofill);
+
+    // Attach all core listeners to the dynamically created inputs
+    inputs.forEach((input, index) => {
+
+        // --- Click/Focus Handler ---
+        input.addEventListener('click', (event) => {
+            if (input.hasAttribute('readonly')) {
+                event.preventDefault();
+                updateInputStateAndFocus(index);
+            } else {
+                input.setSelectionRange(input.value.length, input.value.length);
             }
         });
 
-        // Listen for the autofill/autocomplete event on the first input
-        firstInput.addEventListener('change', handleAutofill);
-        firstInput.addEventListener('input', handleAutofill);
+        input.addEventListener('focus', () => {
+            if (input.hasAttribute('readonly')) {
+                updateInputStateAndFocus(index);
+            }
+        });
 
-        // Auto-focus, combine, backspace, and paste logic
-        inputs.forEach((input, index) => {
+        // --- Input/Typing Handler ---
+        input.addEventListener('input', (event) => {
+            // Check for multi-digit paste/autofill
+            if (index === 0 && input.value.length > 1 && handleAutofill(event)) {
+                return;
+            }
 
-            // --- Click/Focus Handler ---
-            input.addEventListener('click', (event) => {
-                // Redirect focus if clicked input is readonly
-                if (input.hasAttribute('readonly')) {
-                    event.preventDefault();
-                    updateInputStateAndFocus(index);
+            // Handle single-digit manual input
+            input.value = input.value.replace(/[^0-9]/g, '').slice(0, 1);
+
+            if (input.value.length === 1) {
+                if (index < inputs.length - 1) {
+                    inputs[index + 1].removeAttribute('readonly');
+                    inputs[index + 1].focus();
                 } else {
-                    // If it is the current target, set cursor to the end
-                    input.setSelectionRange(input.value.length, input.value.length);
-                }
-            });
-
-            input.addEventListener('focus', () => {
-                // Always ensure focus is on the right element when focus events fire
-                if (input.hasAttribute('readonly')) {
-                    updateInputStateAndFocus(index);
-                }
-            });
-
-
-            // --- Input/Typing Handler (Manual input) ---
-            input.addEventListener('input', (event) => {
-                // 1. Check for autofill/multi-digit paste first
-                if (index === 0 && input.value.length > 1 && handleAutofill(event)) {
-                    return; // Autofill was handled, exit
-                }
-
-                // 2. Handle single-digit manual input
-
-                // Strip non-digits and limit to one character
-                input.value = input.value.replace(/[^0-9]/g, '').slice(0, 1);
-
-                if (input.value.length === 1) {
-                    // A digit was successfully entered
-                    if (index < inputs.length - 1) {
-                        // Enable the next input and move focus
-                        inputs[index + 1].removeAttribute('readonly'); // Make next field writable
-                        inputs[index + 1].focus(); // Jump to the next field
-                    } else {
-                        // Last digit entered
-                        submitFormIfComplete();
-                    }
-                } else {
-                    // Digit was deleted (e.g., user typed non-digit and it was stripped)
-                    // We must still update the state
-                    updateInputStateAndFocus(index);
-                }
-
-                // Update the combined code in the hidden field
-                updateHiddenField();
-            });
-
-            // --- Backspace Handler ---
-            input.addEventListener('keydown', (event) => {
-                const currentIsNotEmpty = input.value.length > 0;
-
-                if (event.key === 'Backspace') {
-
-                    // Case 2: If current input IS empty, move back and clear previous.
-                    if (!currentIsNotEmpty && index > 0) {
-                        event.preventDefault(); // Stop default backspace on empty field
-                        inputs[index - 1].value = ''; // Clear the previous field
-
-                        // State update and focus will happen immediately
-                        updateInputStateAndFocus(index - 1);
-
-                    }
-                    // Case 1: If current input is NOT empty, let the browser delete it.
-                    // The subsequent 'input' event will handle the state update after the clear.
-                }
-            });
-
-            // --- Paste/Autofill Handler (Manual copy-paste) ---
-            input.addEventListener('paste', (event) => {
-                event.preventDefault();
-                const pasteData = event.clipboardData.getData('text').trim().replace(/[^0-9]/g, '').slice(0, codeLength);
-
-                if (pasteData.length > 0) {
-                    // Distribute the pasted digits
-                    for (let i = 0; i < pasteData.length; i++) {
-                        const targetIndex = index + i;
-                        if (inputs[targetIndex]) {
-                            inputs[targetIndex].value = pasteData[i];
-                            inputs[targetIndex].removeAttribute('readonly');
-                        }
-                    }
-
-                    // Update state and focus to the next logical spot (or submit)
-                    updateInputStateAndFocus();
                     submitFormIfComplete();
                 }
-            });
+            } else {
+                updateInputStateAndFocus(index);
+            }
+            updateHiddenField();
         });
 
-        // Fallback for form submission
-        form.addEventListener('submit', updateHiddenField);
+        // --- Backspace Handler ---
+        input.addEventListener('keydown', (event) => {
+            const currentIsNotEmpty = input.value.length > 0;
 
-        // Initial call to ensure everything is set up correctly
-        updateInputStateAndFocus();
-    </script>
+            if (event.key === 'Backspace') {
+                if (!currentIsNotEmpty && index > 0) {
+                    event.preventDefault();
+                    inputs[index - 1].value = '';
+                    updateInputStateAndFocus(index - 1);
+                }
+            }
+        });
+
+        // --- Paste Handler ---
+        input.addEventListener('paste', (event) => {
+            event.preventDefault();
+            const pasteData = event.clipboardData.getData('text').trim().replace(/[^0-9]/g, '').slice(0, codeLength);
+
+            if (pasteData.length > 0) {
+                for (let i = 0; i < pasteData.length; i++) {
+                    const targetIndex = index + i;
+                    if (inputs[targetIndex]) {
+                        inputs[targetIndex].value = pasteData[i];
+                        inputs[targetIndex].removeAttribute('readonly');
+                    }
+                }
+
+                updateInputStateAndFocus();
+                submitFormIfComplete();
+            }
+        });
+    });
+
+    // Fallback for form submission
+    form.addEventListener('submit', updateHiddenField);
+
+    // Initial call to ensure focus is correct on page load
+    updateInputStateAndFocus();
+</script>
 
     <footer>
         Served with
