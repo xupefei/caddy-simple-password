@@ -284,7 +284,7 @@
                 </div>
 
             <input type="hidden" id="dynamic-code-length" value="{{ .TOTPCodeLength }}">
-            <input type="hidden" id="hidden-code" name="totp_code" value="">
+            <input type="hidden" id="hidden-code" name="totp_code" value="" autocomplete="one-time-code">
         </div>
     </form>
     {{- if .ErrorMessage }}
