@@ -51,6 +51,21 @@ When accessing a protected route, users must first complete the primary authenti
 > [!NOTE]
 > **Content Security Policy (CSP)**: The 2FA form applies a dedicated CSP header with a unique nonce for inline styles and sets `form-action` to `'self'`, which overwrites any other CSP configuration that might otherwise restrict inline styles or form submissions. This ensures the form functions correctly and securely.
 
+### Alternative 2FA Form Template
+
+In [Pull Request #8](https://github.com/steffenbusch/caddy-postauth-2fa/pull/8), [@theomessin](https://github.com/theomessin) contributed a beautifully designed alternative 2FA form.
+It supports **dark mode**, and its styling draws inspiration from the Caddy file server's browse template.
+The form is available as `alternative-2fa-form.html` in this directory.
+
+<p align="center">
+  <img src="assets/alternative-totp-input-screen.png" alt="Alternative TOTP 2FA Input Screen">
+</p>
+<p align="center">
+  <img src="assets/alternative-totp-input-screen-dark-mode.png" alt="Alternative TOTP 2FA Input Screen in Dark-Mode">
+</p>
+
+Use the plugin directive `form_template` and point it to the downloaded file to enable this layout.
+
 ## Disclaimer
 
 **Experimental Module**: This plugin is currently in an experimental phase and is primarily developed to meet specific, personal requirements. While contributions and suggestions are welcome, please be aware that this module may lack certain features or robustness expected in production environments.
