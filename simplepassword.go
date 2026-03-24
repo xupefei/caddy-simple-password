@@ -168,14 +168,18 @@ func (m *simplePassword) ServeHTTP(w http.ResponseWriter, r *http.Request, next 
 
 	submittedPassword := r.FormValue("sp_password")
 	if submittedPassword == "" {
-		m.logger.Warn("Missing password in POST")
+		m.logger.Warn("Missing password in POST",
+			zap.String("client_ip", repl.ReplaceAll("{http.request.remote.host}", "")),
+		)
 		m.showPasswordForm(w, fd)
 		return nil
 	}
 
 	// Constant-time comparison to prevent timing attacks
 	if subtle.ConstantTimeCompare([]byte(submittedPassword), []byte(m.password)) != 1 {
-		m.logger.Warn("Invalid password attempt")
+		m.logger.Warn("Invalid password attempt",
+			zap.String("client_ip", repl.ReplaceAll("{http.request.remote.host}", "")),
+		)
 		fd.ErrorMessage = "Invalid password. Please try again."
 		m.showPasswordForm(w, fd)
 		return nil
