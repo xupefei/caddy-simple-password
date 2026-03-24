@@ -5,7 +5,7 @@ A [Caddy](https://caddyserver.com) HTTP handler module that protects routes with
 > **Note:** This code was vibe-coded with AI assistance and reviewed by a human.
 
 <p align="center">
-  <img src="assets/password-form.png" alt="Password Form">
+  <img src="assets/password-form.png" alt="Password Form" width="400">
 </p>
 
 ## Building
