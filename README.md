@@ -32,6 +32,60 @@ xcaddy build --with github.com/xupefei/caddy-simple-password
 }
 ```
 
+### Multiple Sites with a Snippet
+
+```caddyfile
+(auth) {
+    simple_password {
+        password {env.MY_SECRET}
+        session_inactivity_timeout 24h
+    }
+}
+
+site1.example.com {
+    import auth
+    reverse_proxy localhost:3000
+}
+
+site2.example.com {
+    import auth
+    reverse_proxy localhost:4000
+}
+```
+
+### caddy-docker-proxy (Docker Labels)
+
+Define a snippet on the caddy container and import it from each service:
+
+```yaml
+services:
+  caddy:
+    image: custom-caddy
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      - MY_SECRET=supersecret
+    labels:
+      caddy_0: "(auth)"
+      caddy_0.simple_password.password: "{env.MY_SECRET}"
+      caddy_0.simple_password.session_inactivity_timeout: "24h"
+
+  app1:
+    labels:
+      caddy: site1.example.com
+      caddy.import: auth
+      caddy.reverse_proxy: "{{upstreams 3000}}"
+
+  app2:
+    labels:
+      caddy: site2.example.com
+      caddy.import: auth
+      caddy.reverse_proxy: "{{upstreams 4000}}"
+```
+
 ## Configuration Options
 
 | Directive | Description | Default |
