@@ -2,6 +2,8 @@
 
 A [Caddy](https://caddyserver.com) HTTP handler module that protects routes with a single shared password. Sessions are persisted via a hashed-password cookie so users are not re-prompted on every request.
 
+> **Note:** This code was vibe-coded with AI assistance and reviewed by a human.
+
 ## Building
 
 To build Caddy with this module, use xcaddy:
