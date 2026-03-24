@@ -106,6 +106,16 @@ services:
 
 Cookies are set with `HttpOnly`, `Secure`, and `SameSite=Strict`.
 
+## Security
+
+Failed password attempts are logged with the client IP at WARN level:
+
+```
+WARN http.handlers.simple_password Invalid password attempt {"client_ip": "1.2.3.4"}
+```
+
+This can be used with tools like `fail2ban` to block repeated failed attempts.
+
 ## Custom Form Template
 
 You can provide your own HTML template via the `form_template` directive. The template receives:
