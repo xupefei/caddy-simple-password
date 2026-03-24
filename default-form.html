@@ -107,41 +107,18 @@
         text-align: center;
     }
 
-    /* --- Multi-Digit Code Input Styling --- */
-    .code-input-wrapper {
-        display: flex;
-        justify-content: center;
-        gap: 8px;
+    input[type="password"] {
         width: 100%;
-        max-width: 100%;
-        margin: 0 auto;
-    }
-
-    /* Graceful degradation for super-small devices */
-    @media (max-width: 380px) {
-        .code-input-wrapper input[type="text"] {
-            height: 50px;
-            font-size: 1.3em;
-        }
-    }
-
-    .code-input-wrapper input[type="text"] {
-        width: 0;
-        flex-grow: 1;
-        max-width: 45px;
-        height: 55px;
-        padding: 0;
-        font-size: 1.5em;
-        text-align: center;
-        letter-spacing: normal;
+        padding: 12px;
+        font-size: 1em;
         border: 1px solid var(--border-color);
         border-radius: 6px;
-        transition: border-color 0.2s, box-shadow 0.2s;
         background-color: var(--input-bg);
         color: var(--text-color);
+        transition: border-color 0.2s, box-shadow 0.2s;
     }
 
-    .code-input-wrapper input[type="text"]:focus {
+    input[type="password"]:focus {
         border-color: var(--primary-color);
         box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.2);
         outline: none;
@@ -228,13 +205,13 @@
             color: var(--text-color);
         }
 
-        .code-input-wrapper input[type="text"] {
+        input[type="password"] {
             border: 1px solid var(--border-color);
             background-color: var(--input-bg);
             color: var(--text-color);
         }
 
-        .code-input-wrapper input[type="text"]:focus {
+        input[type="password"]:focus {
             border-color: var(--primary-color);
             box-shadow: 0 0 0 2px rgba(109, 170, 243, 0.3);
         }
@@ -274,230 +251,27 @@
 </head>
 <body>
 <div class="container">
-    <h1>Two-factor authentication</h1>
+    <h1>Password Required</h1>
     <p class="description">
-        Enter <span id="code-length-display">{{ .TOTPCodeLength }}</span>-digit code from your authenticator app to continue.
+        Enter the password to continue.
     </p>
-    <form method="POST" action="" id="otp-form">
+    <form method="POST" action="">
         <div class="form-group">
-            <div class="code-input-wrapper" id="code-input-target">
-                </div>
-
-            <input type="hidden" id="dynamic-code-length" value="{{ .TOTPCodeLength }}">
-            <input type="hidden" id="hidden-code" name="totp_code" value="" autocomplete="one-time-code">
+            <input
+                type="password"
+                name="password"
+                placeholder="Password"
+                autocomplete="current-password"
+                required
+                autofocus
+            >
         </div>
+        <button type="submit" class="button-primary">Submit</button>
     </form>
     {{- if .ErrorMessage }}
     <p class="error-message">{{ .ErrorMessage }}</p>
     {{- end }}
 </div>
-
-<script nonce="{{ .Nonce }}">
-    const codeLength = parseInt(document.getElementById('dynamic-code-length').value, 10);
-    const form = document.getElementById('otp-form');
-    const inputTarget = document.getElementById('code-input-target');
-    const hiddenInput = document.getElementById('hidden-code');
-    let inputs = [];
-
-    /**
-     * Creates and appends the required number of single-digit input fields.
-     */
-    function createInputElements() {
-        for (let i = 0; i < codeLength; i++) {
-            const input = document.createElement('input');
-            const index = i + 1;
-
-            input.type = 'text';
-            input.id = 'digit-' + index;
-            input.name = 'digit-' + index;
-            input.maxLength = 1;
-            input.inputMode = 'numeric';
-            input.pattern = '\\d{1}';
-            input.required = true;
-
-            if (i === 0) {
-                input.autofocus = true;
-                input.autocomplete = 'one-time-code';
-            }
-
-            inputTarget.appendChild(input);
-        }
-
-        inputs = Array.from(inputTarget.querySelectorAll('input[type="text"]'));
-        document.getElementById('code-length-display').textContent = codeLength;
-
-        return inputs[0];
-    }
-
-    const firstInput = createInputElements();
-
-    // Combines the digits into the hidden field for submission
-    function updateHiddenField() {
-        const combinedCode = inputs.map(input => input.value).join('');
-        hiddenInput.value = combinedCode;
-        return combinedCode;
-    }
-
-    // Submits the form if all digits are entered
-    function submitFormIfComplete() {
-        const combinedCode = updateHiddenField();
-        if (combinedCode.length === codeLength) {
-            form.submit();
-        }
-    }
-
-    /**
-     * Manages readonly state and forces focus to the first empty input.
-     */
-    function updateInputStateAndFocus(currentInputIndex = -1) {
-        let firstEmptyIndex = -1;
-
-        // 1. Set readonly state based on filled status
-        inputs.forEach((input, index) => {
-            if (input.value.length === 1) {
-                input.removeAttribute('readonly');
-            } else {
-                if (firstEmptyIndex === -1) {
-                    firstEmptyIndex = index;
-                    input.removeAttribute('readonly');
-                } else {
-                    input.setAttribute('readonly', 'readonly');
-                }
-            }
-        });
-
-        // 2. Force focus to the correct input
-        if (firstEmptyIndex !== -1) {
-            const targetIndex = (currentInputIndex !== -1 && !inputs[currentInputIndex].hasAttribute('readonly'))
-                                    ? currentInputIndex
-                                    : firstEmptyIndex;
-
-            inputs[targetIndex].focus();
-            inputs[targetIndex].setSelectionRange(inputs[targetIndex].value.length, inputs[targetIndex].value.length);
-        } else if (inputs.length > 0) {
-            // All inputs are full, focus on the last one
-            inputs[inputs.length - 1].focus();
-            inputs[inputs.length - 1].setSelectionRange(inputs[inputs.length - 1].value.length, inputs[inputs.length - 1].value.length);
-        }
-
-        updateHiddenField();
-    }
-
-    // Handles autofill/multi-digit paste from the first input
-    function handleAutofill(event) {
-        let fullCode = firstInput.value.replace(/[^0-9]/g, '');
-
-        if (fullCode.length > 1 || fullCode.length === codeLength) {
-            event.preventDefault();
-
-            // Distribute the code across all inputs
-            for (let i = 0; i < codeLength; i++) {
-                if (i < fullCode.length) {
-                    inputs[i].value = fullCode[i];
-                    inputs[i].removeAttribute('readonly');
-                } else {
-                    inputs[i].value = '';
-                }
-            }
-
-            updateInputStateAndFocus();
-            submitFormIfComplete();
-            return true;
-        }
-        return false;
-    }
-
-    // Initial Setup: Set all but the first input to readonly
-    inputs.forEach((input, index) => {
-        if (index > 0) {
-            input.setAttribute('readonly', 'readonly');
-        }
-    });
-
-    // Listen for the autofill/autocomplete event on the first input
-    firstInput.addEventListener('change', handleAutofill);
-
-    // Attach all core listeners to the dynamically created inputs
-    inputs.forEach((input, index) => {
-
-        // --- Click/Focus Handler ---
-        input.addEventListener('click', (event) => {
-            if (input.hasAttribute('readonly')) {
-                event.preventDefault();
-                updateInputStateAndFocus(index);
-            } else {
-                input.setSelectionRange(input.value.length, input.value.length);
-            }
-        });
-
-        input.addEventListener('focus', () => {
-            if (input.hasAttribute('readonly')) {
-                updateInputStateAndFocus(index);
-            }
-        });
-
-        // --- Input/Typing Handler ---
-        input.addEventListener('input', (event) => {
-            // Check for multi-digit paste/autofill
-            if (index === 0 && input.value.length > 1 && handleAutofill(event)) {
-                return;
-            }
-
-            // Handle single-digit manual input
-            input.value = input.value.replace(/[^0-9]/g, '').slice(0, 1);
-
-            if (input.value.length === 1) {
-                if (index < inputs.length - 1) {
-                    inputs[index + 1].removeAttribute('readonly');
-                    inputs[index + 1].focus();
-                } else {
-                    submitFormIfComplete();
-                }
-            } else {
-                updateInputStateAndFocus(index);
-            }
-            updateHiddenField();
-        });
-
-        // --- Backspace Handler ---
-        input.addEventListener('keydown', (event) => {
-            const currentIsNotEmpty = input.value.length > 0;
-
-            if (event.key === 'Backspace') {
-                if (!currentIsNotEmpty && index > 0) {
-                    event.preventDefault();
-                    inputs[index - 1].value = '';
-                    updateInputStateAndFocus(index - 1);
-                }
-            }
-        });
-
-        // --- Paste Handler ---
-        input.addEventListener('paste', (event) => {
-            event.preventDefault();
-            const pasteData = event.clipboardData.getData('text').trim().replace(/[^0-9]/g, '').slice(0, codeLength);
-
-            if (pasteData.length > 0) {
-                for (let i = 0; i < pasteData.length; i++) {
-                    const targetIndex = index + i;
-                    if (inputs[targetIndex]) {
-                        inputs[targetIndex].value = pasteData[i];
-                        inputs[targetIndex].removeAttribute('readonly');
-                    }
-                }
-
-                updateInputStateAndFocus();
-                submitFormIfComplete();
-            }
-        });
-    });
-
-    // Fallback for form submission
-    form.addEventListener('submit', updateHiddenField);
-
-    // Initial call to ensure focus is correct on page load
-    updateInputStateAndFocus();
-</script>
 
     <footer>
         Served with
@@ -521,6 +295,14 @@
                                     </g>
                                     <g transform="matrix(-5.33921,-5.26159,-3.12106,-6.96393,4073.87,1861.55)">
                                         <path d="M10.315,5.333C10.315,5.333 9.748,5.921 9.03,6.673C7.768,7.995 6.054,9.805 6.054,9.805L6.237,9.86C6.237,9.86 8.045,8.077 9.36,6.771C10.107,6.028 10.689,5.444 10.689,5.444L10.315,5.333Z" fill="rgb(0,144,221)"></path>
+                                    </g>
+                                </g>
+                                <g>
+                                    <g transform="matrix(5.30977,0.697415,-0.697415,5.30977,3852.72,1727.97)">
+                                        <path d="M22,12C22,11.659 21.913,11.337 21.76,11.055C21.421,10.429 20.756,10 20,10C18.903,10 18,10.903 18,12C18,13.097 18.903,14 20,14C21.097,14 22,13.097 22,12Z" fill="none" fill-rule="nonzero" stroke="rgb(0,144,221)" stroke-width="0.98px"></path>
+                                    </g>
+                                    <g transform="matrix(4.93114,2.49604,1.11018,5.44847,3921.41,1726.72)">
+                                        <path d="M8.902,6.77C8.902,6.77 7.235,8.253 6.027,9.366C5.343,9.996 4.819,10.502 4.819,10.502L5.52,11.164C5.52,11.164 6.021,10.637 6.646,9.951C7.749,8.739 9.219,7.068 9.219,7.068L8.902,6.77Z" fill="rgb(0,144,221)"></path>
                                     </g>
                                 </g>
                                 <g id="Padlock" transform="matrix(3.11426,0,0,3.11426,3938.31,1737.25)">

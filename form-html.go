@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package postauth2fa
+package simplepassword
 
 import (
 	"crypto/rand"
@@ -24,19 +24,18 @@ import (
 	"go.uber.org/zap"
 )
 
-// default2FAFormHTML contains the default HTML content for the 2FA form.
+// defaultFormHTML contains the default HTML content for the password form.
 // By default, its value is an embedded document. To configure a custom
 // HTML form, set Caddyfile subdirective `form_template` to the path of
 // an external HTML file.
 //
-//go:embed default-2fa-form.html
-var default2FAFormHTML string
+//go:embed default-form.html
+var defaultFormHTML string
 
-// formData holds the data to be passed to the 2FA form template
+// formData holds the data to be passed to the password form template
 type formData struct {
-	Nonce          string
-	ErrorMessage   string
-	TOTPCodeLength int
+	Nonce        string
+	ErrorMessage string
 }
 
 // generateNonce generates a random base64 nonce
@@ -49,14 +48,14 @@ func generateNonce() (string, error) {
 	return base64.StdEncoding.EncodeToString(nonceBytes), nil
 }
 
-// provisionTemplate sets up the HTML template for the 2FA form.
-func (m *postauth2fa) provisionTemplate() error {
+// provisionTemplate sets up the HTML template for the password form.
+func (m *simplePassword) provisionTemplate() error {
 	var err error
 	// Load the external custom HTML template if set
 	if m.FormTemplateFile != "" {
 		m.formTemplate, err = template.ParseFiles(m.FormTemplateFile)
 		if err != nil {
-			m.logger.Warn("failed to load custom 2FA form template, using default",
+			m.logger.Warn("failed to load custom form template, using default",
 				zap.String("template_path", m.FormTemplateFile),
 				zap.Error(err))
 		}
@@ -66,9 +65,9 @@ func (m *postauth2fa) provisionTemplate() error {
 	// or if there was an error loading the custom template
 	if m.FormTemplateFile == "" || err != nil {
 		// Parse the embedded HTML content
-		m.formTemplate, err = template.New("2fa_form").Parse(default2FAFormHTML)
+		m.formTemplate, err = template.New("password_form").Parse(defaultFormHTML)
 		if err != nil {
-			m.logger.Error("failed to parse default 2FA form template",
+			m.logger.Error("failed to parse default form template",
 				zap.Error(err))
 			return err
 		}
@@ -76,14 +75,14 @@ func (m *postauth2fa) provisionTemplate() error {
 	return nil
 }
 
-// show2FAForm displays a styled 2FA form with an error message if provided.
+// showPasswordForm displays a styled password form with an error message if provided.
 // It generates a nonce for the Content-Security-Policy and uses either a custom
 // or default HTML template to render the form.
-func (m *postauth2fa) show2FAForm(w http.ResponseWriter, formData formData) {
+func (m *simplePassword) showPasswordForm(w http.ResponseWriter, formData formData) {
 	// Generate a nonce for this request
 	nonce, err := generateNonce()
 	if err != nil {
-		m.logger.Error("failed to generate nonce for 2FA form",
+		m.logger.Error("failed to generate nonce for password form",
 			zap.Error(err))
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 		return
@@ -99,7 +98,7 @@ func (m *postauth2fa) show2FAForm(w http.ResponseWriter, formData formData) {
 
 	// Execute the template and write the output to the response
 	if err := m.formTemplate.Execute(w, formData); err != nil {
-		m.logger.Error("failed to execute 2FA form template",
+		m.logger.Error("failed to execute password form template",
 			zap.Error(err))
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 		return
