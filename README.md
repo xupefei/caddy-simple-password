@@ -101,8 +101,8 @@ services:
 
 1. On first visit, the user sees a password form.
 2. On correct password submission, a cookie is set with the value `hex(SHA256(password))` and `Max-Age` based on the configured timeout.
-3. Subsequent requests with a valid cookie pass through without re-prompting.
-4. When the cookie expires (or is cleared), the user is prompted again.
+3. Subsequent requests with a valid cookie pass through without re-prompting. The cookie expiry is refreshed on every authenticated request (sliding session), so the timeout only applies to periods of inactivity.
+4. When the cookie expires after inactivity (or is cleared), the user is prompted again.
 
 Cookies are set with `HttpOnly`, `Secure`, and `SameSite=Strict`.
 

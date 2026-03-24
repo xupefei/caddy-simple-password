@@ -136,9 +136,19 @@ func (m *simplePassword) ServeHTTP(w http.ResponseWriter, r *http.Request, next 
 		return caddyhttp.Error(http.StatusInternalServerError, nil)
 	}
 
-	// Check for valid session cookie
+	// Check for valid session cookie; refresh on every request (sliding session)
 	if cookie, err := r.Cookie(m.CookieName); err == nil {
 		if subtle.ConstantTimeCompare([]byte(cookie.Value), []byte(m.passwordHash)) == 1 {
+			http.SetCookie(w, &http.Cookie{
+				Name:     m.CookieName,
+				Value:    m.passwordHash,
+				Path:     m.CookiePath,
+				Domain:   m.CookieDomain,
+				MaxAge:   int(m.SessionInactivityTimeout.Seconds()),
+				HttpOnly: true,
+				Secure:   true,
+				SameSite: http.SameSiteStrictMode,
+			})
 			return next.ServeHTTP(w, r)
 		}
 	}
@@ -156,7 +166,7 @@ func (m *simplePassword) ServeHTTP(w http.ResponseWriter, r *http.Request, next 
 		return nil
 	}
 
-	submittedPassword := r.FormValue("password")
+	submittedPassword := r.FormValue("sp_password")
 	if submittedPassword == "" {
 		m.logger.Warn("Missing password in POST")
 		m.showPasswordForm(w, fd)
