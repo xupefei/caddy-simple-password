@@ -49,7 +49,7 @@ type simplePassword struct {
 	passwordHash string
 
 	// CookieName defines the name of the cookie used to store the session token.
-	// Default is `sp_sess`.
+	// Default is `sp_password_z086wRwcGNt6nFH`.
 	CookieName string `json:"cookie_name,omitempty"`
 
 	// CookiePath specifies the path scope of the cookie.
@@ -84,7 +84,7 @@ func (m *simplePassword) Provision(ctx caddy.Context) error {
 
 	// Set default values if not provided
 	if m.CookieName == "" {
-		m.CookieName = "sp_sess"
+		m.CookieName = "sp_password_z086wRwcGNt6nFH"
 	}
 	if m.CookiePath == "" {
 		m.CookiePath = "/"
