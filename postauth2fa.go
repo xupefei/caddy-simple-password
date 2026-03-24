@@ -18,11 +18,9 @@ import (
 	"context"
 	"encoding/base64"
 	"fmt"
-	"html"
 	"html/template"
 	"net"
 	"net/http"
-	"sync"
 	"time"
 
 	"go.uber.org/zap"
@@ -33,33 +31,31 @@ import (
 	"github.com/pquerna/otp/totp"
 )
 
-// postauth2fa is a Caddy HTTP handler module that adds TOTP-based two-factor authentication (2FA)
-// after a primary authentication handler (such as basic_auth). It enforces an additional TOTP code
-// check for protected routes. The module supports per-user TOTP secrets (plaintext or AES-GCM-encrypted),
-// session management via JWT cookies, and optional IP binding for session validation.
+// postauth2fa is a Caddy HTTP handler module that adds TOTP-based authentication.
+// It protects routes with a single shared TOTP code — no usernames or passwords required.
 // Features:
-//   - TOTP 2FA enforcement after primary authentication (e.g., basic_auth, jwtauth, etc.)
-//   - Per-user TOTP secrets (plaintext or encrypted), loaded from a JSON file (map of usernames)
-//   - Configurable inactivity timeout for 2FA sessions (JWT-based, stateless, cookie storage)
+//   - Standalone TOTP authentication (no prior auth handler needed)
+//   - Single shared TOTP secret configured directly in the Caddyfile
+//   - Configurable inactivity timeout for sessions (JWT-based, stateless, cookie storage)
 //   - Optional IP binding for session validation (enabled by default, can be disabled)
 //   - Customizable session cookie name, path, and domain
 //   - Customizable HTML form template for TOTP code entry
-//   - Per-user or global TOTP code length (6 or 8 digits)
-//   - Secure handling of secrets and keys (Caddy placeholders and file includes supported)
+//   - Configurable TOTP code length (6 or 8 digits)
+//   - Secure handling of secrets and keys (Caddy placeholders supported)
 //   - No server-side session state: JWTs are stateless, reloads/restarts do not invalidate sessions
-//
-// Note: This module does not provide user management, TOTP provisioning, or logout functionality.
-// It is intended to be used together with a primary authentication handler.
 type postauth2fa struct {
 	// SessionInactivityTimeout defines the maximum allowed period of inactivity before
-	// a 2FA session expires and requires re-authentication. Default is 60 minutes.
+	// a session expires and requires re-authentication. Default is 60 minutes.
 	SessionInactivityTimeout time.Duration `json:"session_inactivity_timeout,omitempty"`
 
-	// SecretsFilePath specifies the path to the JSON file containing TOTP secrets for each user.
-	// This file should contain usernames and their corresponding TOTP secrets.
-	SecretsFilePath string `json:"secrets_file_path,omitempty"`
+	// TOTPSecret is the shared TOTP secret (base32 encoded). Supports Caddy placeholders
+	// like {env.TOTP_SECRET} or {file./path/to/secret.txt}.
+	TOTPSecret string `json:"totp_secret,omitempty"`
 
-	// CookieName defines the name of the cookie used to store the session token for 2FA.
+	// totpSecretResolved is the resolved TOTP secret after placeholder replacement.
+	totpSecretResolved string
+
+	// CookieName defines the name of the cookie used to store the session token.
 	// Default is `cpa_sess`.
 	CookieName string `json:"cookie_name,omitempty"`
 
@@ -69,11 +65,6 @@ type postauth2fa struct {
 
 	// CookieDomain specifies the domain scope of the cookie.
 	CookieDomain string `json:"cookie_domain,omitempty"`
-
-	// UsernamePlaceholder defines the Caddy placeholder used to extract the authenticated username
-	// from the request context. This should match the placeholder set by the authentication handler,
-	// such as "{http.auth.user.id}" for basic_auth. If not set, defaults to "{http.auth.user.id}".
-	UsernamePlaceholder string `json:"username_placeholder,omitempty"`
 
 	// IPBinding controls whether the session is bound to the client IP address.
 	// Accepts "true" (default) or "false". Can use Caddy placeholders.
@@ -85,7 +76,7 @@ type postauth2fa struct {
 	// TOTPCodeLength defines the expected length of the TOTP code (default: 6).
 	TOTPCodeLength int `json:"totp_code_length,omitempty"`
 
-	// template is the parsed HTML template used to render the 2FA form.
+	// formTemplate is the parsed HTML template used to render the TOTP form.
 	formTemplate *template.Template
 
 	// SignKey is the base64 encoded secret key used to sign the JWTs.
@@ -94,22 +85,7 @@ type postauth2fa struct {
 	// signKeyBytes is the base64 decoded secret key used to sign the JWTs.
 	signKeyBytes []byte
 
-	// EncryptionKey is the base64 encoded key used to decrypt encrypted TOTP secrets.
-	EncryptionKey string `json:"encryption_key,omitempty"`
-
-	// encryptionKeyBytes is the base64 decoded key used for decryption.
-	encryptionKeyBytes []byte
-
-	// loadedUserSecrets holds the map of user secrets and TOTP code lengths, loaded from the SecretsFilePath JSON file.
-	// This map is populated when the file is read and accessed when validating TOTP codes.
-	loadedUserSecrets map[string]userSecretEntry
-
-	// secretsLoadMutex is used to synchronize access to the loadedUserSecrets map.
-	// This prevents race conditions when loading or accessing user secrets.
-	secretsLoadMutex *sync.Mutex
-
 	// logger provides structured logging for the module.
-	// It's initialized in the Provision method and used throughout the module for debug information.
 	logger *zap.Logger
 }
 
@@ -126,11 +102,6 @@ func (m *postauth2fa) Provision(ctx caddy.Context) error {
 	m.logger = ctx.Logger()
 	repl := caddy.NewReplacer()
 
-	// Initialize the mutex if it's nil
-	if m.secretsLoadMutex == nil {
-		m.secretsLoadMutex = &sync.Mutex{}
-	}
-
 	// Set default values if not provided
 	if m.CookieName == "" {
 		m.CookieName = "cpa_sess"
@@ -139,9 +110,8 @@ func (m *postauth2fa) Provision(ctx caddy.Context) error {
 		m.CookiePath = "/"
 	}
 	if m.SessionInactivityTimeout == 0 {
-		m.SessionInactivityTimeout = 60 * time.Minute // Default inactivity timeout
+		m.SessionInactivityTimeout = 60 * time.Minute
 	}
-	// Set default TOTP code length if not provided
 	if m.TOTPCodeLength == 0 {
 		m.TOTPCodeLength = 6
 	}
@@ -156,17 +126,8 @@ func (m *postauth2fa) Provision(ctx caddy.Context) error {
 		return err
 	}
 
-	// Replace placeholders in the EncryptionKey such as {env.TOTP_ENCRYPTION_KEY}
-	m.EncryptionKey = repl.ReplaceAll(m.EncryptionKey, "")
-	m.encryptionKeyBytes, err = base64.StdEncoding.DecodeString(m.EncryptionKey)
-	if err != nil {
-		m.logger.Error("Failed to decode encryption key", zap.Error(err))
-		return err
-	}
-
-	if m.UsernamePlaceholder == "" {
-		m.UsernamePlaceholder = "{http.auth.user.id}"
-	}
+	// Replace placeholders in the TOTP secret such as {env.TOTP_SECRET}
+	m.totpSecretResolved = repl.ReplaceAll(m.TOTPSecret, "")
 
 	// Set default for IPBinding if not provided
 	if m.IPBinding == "" {
@@ -180,8 +141,6 @@ func (m *postauth2fa) Provision(ctx caddy.Context) error {
 
 	// Log the chosen configuration values
 	m.logger.Info("postauth2fa plugin configured",
-		zap.String("Secrets File Path", m.SecretsFilePath),
-		zap.String("Username Placeholder", m.UsernamePlaceholder),
 		zap.String("Cookie name", m.CookieName),
 		zap.String("Cookie path", m.CookiePath),
 		zap.String("Cookie domain", m.CookieDomain),
@@ -189,8 +148,7 @@ func (m *postauth2fa) Provision(ctx caddy.Context) error {
 		zap.String("IP Binding", m.IPBinding),
 		zap.Duration("Session Inactivity Timeout", m.SessionInactivityTimeout),
 		zap.Int("TOTP Code Length", m.TOTPCodeLength),
-		// SignKey is omitted from the log output for security reasons.
-		// EncryptionKey is also omitted.
+		// TOTPSecret and SignKey are omitted from the log output for security reasons.
 	)
 	return nil
 }
@@ -201,23 +159,21 @@ func (m *postauth2fa) Validate() error {
 		return fmt.Errorf("SessionInactivityTimeout must be a positive duration")
 	}
 
+	if m.totpSecretResolved == "" {
+		return fmt.Errorf("totp_secret must be defined")
+	}
+
 	// Check if the base64 encoded sign key is set
 	if m.SignKey == "" {
 		return fmt.Errorf("SignKey must be defined")
 	}
 
 	// Check if the base64 decoded sign key has an appropriate length
-	if len(m.signKeyBytes) < 32 { // 32 bytes is commonly recommended as a minimum for security
+	if len(m.signKeyBytes) < 32 {
 		return fmt.Errorf("decoded sign key must be at least 32 bytes long, but it is %d bytes long, check the base64 encoded sign key", len(m.signKeyBytes))
 	}
 
-	// Check if the optional base64 decoded encryption key has the correct length
-	if m.EncryptionKey != "" && len(m.encryptionKeyBytes) != 32 {
-		return fmt.Errorf("decoded encryption key must be 32 bytes (256 bits) long, but is %d bytes", len(m.encryptionKeyBytes))
-	}
-
 	// Validate TOTPCodeLength
-	// Only allow 6 or 8 digits for TOTP codes
 	if !isValidTOTPCodeLength(m.TOTPCodeLength) {
 		return fmt.Errorf("TOTPCodeLength must be 6 or 8")
 	}
@@ -225,67 +181,32 @@ func (m *postauth2fa) Validate() error {
 	return nil
 }
 
-// ServeHTTP handles incoming HTTP requests and checks for IP changes.
+// ServeHTTP handles incoming HTTP requests, checking for a valid session or prompting for a TOTP code.
 func (m *postauth2fa) ServeHTTP(w http.ResponseWriter, r *http.Request, next caddyhttp.Handler) error {
-	// Access the replacer from the request context to retrieve the requests original URI / path placeholders.
 	repl, ok := r.Context().Value(caddy.ReplacerCtxKey).(*caddy.Replacer)
 	if !ok {
 		m.logger.Error("Failed to retrieve caddy.Replacer from request context")
 		return caddyhttp.Error(http.StatusInternalServerError, nil)
 	}
 
-	username := repl.ReplaceAll(m.UsernamePlaceholder, "")
-	if username == "" {
-		m.logger.Error("No authenticated user found - possible misconfiguration or missing authentication handler")
-		return caddyhttp.Error(http.StatusInternalServerError, fmt.Errorf("no authenticated user found"))
-	}
-
 	// Retrieve the client IP address from the Caddy context.
 	clientIP := getClientIP(r.Context(), r.RemoteAddr)
 
-	// Create logger with common fields
 	logger := m.logger.With(
-		zap.String("username", username),
 		zap.String("client_ip", clientIP),
 	)
 
 	// Replace placeholders in IPBinding (allows dynamic config)
 	ipBindingValue := repl.ReplaceAll(m.IPBinding, "true")
 
-	// Validate session and check IP consistency (IP binding logic is now in hasValidJWTCookie)
-	if m.hasValidJWTCookie(w, r, username, clientIP, ipBindingValue) {
+	// Validate session
+	if m.hasValidJWTCookie(w, r, clientIP, ipBindingValue) {
 		return next.ServeHTTP(w, r)
 	}
 
-	// Initialize FormData with the html escaped username
 	formData := formData{
-		Username: html.EscapeString(username),
+		TOTPCodeLength: m.TOTPCodeLength,
 	}
-
-	// Attempt to retrieve the TOTP secret for the user.
-	// If an error occurs while fetching the secret (e.g., if no TOTP secret is set for the user),
-	// log it and show an error message.
-	secret, codeLength, err := m.getSecretForUser(username)
-	if err != nil {
-		logger.Error("Failed to retrieve the user's TOTP secret", zap.String("Secrets File Path", m.SecretsFilePath), zap.Error(err))
-		formData.ErrorMessage = "Invalid TOTP configuration. Please contact support."
-		m.show2FAForm(w, formData)
-		return nil
-	}
-
-	// If codeLength is not set in the user secrets file, use the module's configured TOTP code length.
-	if codeLength == 0 {
-		codeLength = m.TOTPCodeLength
-	}
-
-	// Only allow 6 or 8 digits for per-user code length
-	if !isValidTOTPCodeLength(codeLength) {
-		logger.Error("Invalid per-user TOTP code length", zap.Int("code_length", codeLength))
-		formData.ErrorMessage = "Invalid TOTP configuration. Please contact support."
-		m.show2FAForm(w, formData)
-		return nil
-	}
-	formData.TOTPCodeLength = codeLength
 
 	if r.Method != http.MethodPost {
 		m.show2FAForm(w, formData)
@@ -299,37 +220,32 @@ func (m *postauth2fa) ServeHTTP(w http.ResponseWriter, r *http.Request, next cad
 	}
 
 	totpCode := r.FormValue("totp_code")
-	// Check if the TOTP code is missing; if so, log and prompt for 2FA again.
 	if totpCode == "" {
 		logger.Warn("Missing TOTP code in POST")
 		m.show2FAForm(w, formData)
 		return nil
 	}
 
-	// Validate the TOTP code with the user's secret and code length.
-	valid, err := validateTOTPCode(totpCode, secret, codeLength)
+	// Validate the TOTP code against the configured secret.
+	valid, err := validateTOTPCode(totpCode, m.totpSecretResolved, m.TOTPCodeLength)
 	if !valid || err != nil {
-		// If validation fails, log an invalid TOTP attempt for monitoring tools like fail2ban.
 		logger.Warn("Invalid TOTP attempt", zap.Error(err))
 		formData.ErrorMessage = "Invalid TOTP code. Please try again."
 		m.show2FAForm(w, formData)
 		return nil
 	}
 
-	// Create a new JWT session cookie for the user on successful TOTP validation.
-	m.createOrUpdateJWTCookie(w, username, clientIP)
+	// Create a new JWT session cookie on successful TOTP validation.
+	m.createOrUpdateJWTCookie(w, clientIP)
 
 	// Retrieve the unmodified request's original URI (e.g., full path before handle_path stripped it).
-	// Fallback to the current request URI if the request's original URI is unavailable.
 	redirectURL := repl.ReplaceAll("{http.request.orig_uri}", r.URL.RequestURI())
 
-	// Log the final redirect decision for debugging purposes.
 	logger.Debug("Session ok, redirecting",
 		zap.String("redirect_url", redirectURL),
 		zap.String("current_request_uri", r.URL.RequestURI()),
 	)
 
-	// Redirect the client to the original requested URL.
 	http.Redirect(w, r, redirectURL, http.StatusFound)
 	return nil
 }

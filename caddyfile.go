@@ -58,14 +58,12 @@ func (m *postauth2fa) UnmarshalCaddyfile(d *caddyfile.Dispenser) error {
 				m.CookieName = arg
 			case "cookie_path":
 				m.CookiePath = arg
-			case "encryption_key":
-				m.EncryptionKey = arg
 			case "form_template":
 				m.FormTemplateFile = arg
 			case "ip_binding":
 				m.IPBinding = arg
-			case "secrets_file_path":
-				m.SecretsFilePath = arg
+			case "totp_secret":
+				m.TOTPSecret = arg
 			case "session_inactivity_timeout":
 				duration, err := time.ParseDuration(arg)
 				if err != nil {
@@ -80,11 +78,9 @@ func (m *postauth2fa) UnmarshalCaddyfile(d *caddyfile.Dispenser) error {
 					return d.Errf("invalid totp_code_length: must be an integer")
 				}
 				if !isValidTOTPCodeLength(length) {
-					return d.Errf("invalid totp_code_length: eiher 6 or 8 digits are allowed")
+					return d.Errf("invalid totp_code_length: either 6 or 8 digits are allowed")
 				}
 				m.TOTPCodeLength = length
-			case "username_placeholder":
-				m.UsernamePlaceholder = arg
 			default:
 				return d.Errf("unknown subdirective: %s", param)
 			}

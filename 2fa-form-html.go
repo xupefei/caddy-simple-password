@@ -36,7 +36,6 @@ var default2FAFormHTML string
 type formData struct {
 	Nonce          string
 	ErrorMessage   string
-	Username       string
 	TOTPCodeLength int
 }
 
