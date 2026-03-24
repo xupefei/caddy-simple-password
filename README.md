@@ -4,6 +4,10 @@ A [Caddy](https://caddyserver.com) HTTP handler module that protects routes with
 
 > **Note:** This code was vibe-coded with AI assistance and reviewed by a human.
 
+<p align="center">
+  <img src="assets/password-form.png" alt="Password Form">
+</p>
+
 ## Building
 
 To build Caddy with this module, use xcaddy:
