@@ -92,7 +92,7 @@ services:
 |---|---|---|
 | `password` | The shared password. Supports Caddy placeholders like `{env.PASSWORD}` or `{file./path/to/password.txt}`. | *(required)* |
 | `session_inactivity_timeout` | How long a session lasts before re-prompting. Uses Go duration syntax (`30m`, `2h`, `168h` for 7 days, `8760h` for 1 year). | `60m` |
-| `cookie_name` | Name of the session cookie. | `sp_password_z086wRwcGNt6nFH` |
+| `cookie_name` | Name of the session cookie. | `sp_sess` |
 | `cookie_path` | Path scope for the session cookie. | `/` |
 | `cookie_domain` | Domain scope for the session cookie. | *(unset)* |
 | `form_template` | Path to a custom HTML template for the password form. | embedded default |
